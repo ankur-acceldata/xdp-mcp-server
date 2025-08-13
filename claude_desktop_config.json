@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "xdp": {
+      "command": "node",
+      "args": ["/Users/ankuragarwal/src/xdp-mcp-server/dist/index.js"],
+      "env": {
+        "XDP_ACCESS_KEY": "ZUDOSEQZQEKQCTJ",
+        "XDP_SECRET_KEY": "TY2C51SAU3CHUALOVDY4JEOYGFCSM0"
+      }
+    }
+  }
+}

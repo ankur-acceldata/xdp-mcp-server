@@ -1,0 +1,26 @@
+{
+  "name": "xdp-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for XDP (eXtended Data Platform) integration",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "echo \"Testing with Claude Desktop\" && node dist/index.js",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["mcp", "xdp", "data-engineering", "claude"],
+  "author": "XDP Team",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
