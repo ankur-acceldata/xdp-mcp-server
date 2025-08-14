@@ -46,4 +46,40 @@ export interface ListDataStoresResponse {
         totalPages: number;
     };
 }
+export interface TrinoQueryRequest {
+    engine: 'TRINO';
+    dataplane: string;
+    query: string;
+}
+export interface TrinoQueryResponse {
+    id: number;
+    runRequestId: string;
+    queryId: string;
+    error: string | null;
+    status: string;
+    result: {
+        id: string;
+        state: string | null;
+        columns: Array<{
+            name: string;
+            type: string;
+            typeSignature?: {
+                rawType: string;
+                arguments?: any[];
+            };
+        }>;
+        data: any[][];
+        stats?: any;
+        error: string | null;
+        nextUri: string | null;
+        infoUri: string;
+        updateType: string | null;
+        warnings: any[];
+        failureInfo: any | null;
+    };
+}
+export interface TrinoExecuteParams {
+    dataplane: string;
+    query: string;
+}
 //# sourceMappingURL=xdp-types.d.ts.map

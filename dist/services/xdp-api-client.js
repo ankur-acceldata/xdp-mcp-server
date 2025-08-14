@@ -9,7 +9,7 @@ export class XDPApiClient {
     config;
     constructor(config) {
         this.config = {
-            baseUrl: config?.baseUrl || process.env.XDP_BASE_URL || 'https://demo.xdp.acceldata.tech/xdp-cp-service/api',
+            baseUrl: config?.baseUrl || process.env.XDP_BASE_URL || 'https://demo.xdp-playground.acceldata.tech/xdp-cp-service/api',
             accessKey: config?.accessKey || process.env.XDP_ACCESS_KEY || '',
             secretKey: config?.secretKey || process.env.XDP_SECRET_KEY || ''
         };
@@ -124,6 +124,68 @@ export class XDPApiClient {
             baseUrl: this.config.baseUrl,
             accessKey: this.config.accessKey.substring(0, 4) + '***'
         };
+    }
+    /**
+     * Execute a Trino query
+     */
+    async executeTrinoQuery(params) {
+        try {
+            const queryRequest = {
+                engine: 'TRINO',
+                dataplane: params.dataplane,
+                query: params.query
+            };
+            console.error(`[XDP API] Executing Trino query on dataplane ${params.dataplane}`);
+            console.error(`[XDP API] Query: ${params.query.substring(0, 100)}...`);
+            const response = await this.client.post('/query/execute', queryRequest);
+            // Check if the query failed
+            if (response.data.error || response.data.result?.error) {
+                const errorMsg = response.data.error || response.data.result?.error;
+                throw new Error(`Trino query error: ${errorMsg}`);
+            }
+            console.error(`[XDP API] Query executed successfully. Status: ${response.data.status}`);
+            return response.data;
+        }
+        catch (error) {
+            console.error('[XDP API] Failed to execute Trino query:', error);
+            throw error;
+        }
+    }
+    /**
+     * List Trino catalogs
+     */
+    async listTrinoCatalogs(dataplane) {
+        return this.executeTrinoQuery({
+            dataplane,
+            query: 'SHOW CATALOGS'
+        });
+    }
+    /**
+     * List tables in a Trino schema
+     */
+    async listTrinoTables(dataplane, catalog, schema) {
+        const query = schema
+            ? `SHOW TABLES FROM ${catalog}.${schema}`
+            : `SELECT table_schema, table_name, table_type FROM ${catalog}.information_schema.tables`;
+        return this.executeTrinoQuery({
+            dataplane,
+            query
+        });
+    }
+    /**
+     * Get column information for a Trino table
+     */
+    async getTrinoTableColumns(dataplane, catalog, schema, table) {
+        const query = `
+      SELECT column_name, data_type, is_nullable, column_default, ordinal_position 
+      FROM ${catalog}.information_schema.columns 
+      WHERE table_schema = '${schema}' AND table_name = '${table}' 
+      ORDER BY ordinal_position
+    `.trim();
+        return this.executeTrinoQuery({
+            dataplane,
+            query
+        });
     }
 }
 //# sourceMappingURL=xdp-api-client.js.map

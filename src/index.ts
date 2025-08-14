@@ -14,7 +14,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { XDPApiClient } from './services/xdp-api-client.js';
-import type { ListDataStoresParams } from './types/xdp-types.js';
+import type { ListDataStoresParams, TrinoExecuteParams } from './types/xdp-types.js';
 
 class XDPMCPServer {
   private server: Server;
@@ -82,6 +82,86 @@ class XDPMCPServer {
                 }
               }
             }
+          },
+          {
+            name: 'trino_execute_query',
+            description: 'Execute a custom Trino SQL query on the specified dataplane',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                dataplane: {
+                  type: 'string',
+                  description: 'The dataplane ID to execute the query on'
+                },
+                query: {
+                  type: 'string',
+                  description: 'The Trino SQL query to execute'
+                }
+              },
+              required: ['dataplane', 'query']
+            }
+          },
+          {
+            name: 'trino_list_catalogs',
+            description: 'List all available Trino catalogs in the specified dataplane',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                dataplane: {
+                  type: 'string',
+                  description: 'The dataplane ID to list catalogs from'
+                }
+              },
+              required: ['dataplane']
+            }
+          },
+          {
+            name: 'trino_list_tables',
+            description: 'List tables in a Trino catalog and schema',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                dataplane: {
+                  type: 'string',
+                  description: 'The dataplane ID'
+                },
+                catalog: {
+                  type: 'string',
+                  description: 'The Trino catalog name'
+                },
+                schema: {
+                  type: 'string',
+                  description: 'The schema name (optional, if not provided lists all tables in catalog)'
+                }
+              },
+              required: ['dataplane', 'catalog']
+            }
+          },
+          {
+            name: 'trino_describe_table',
+            description: 'Get column information for a specific Trino table',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                dataplane: {
+                  type: 'string',
+                  description: 'The dataplane ID'
+                },
+                catalog: {
+                  type: 'string',
+                  description: 'The Trino catalog name'
+                },
+                schema: {
+                  type: 'string',
+                  description: 'The schema name'
+                },
+                table: {
+                  type: 'string',
+                  description: 'The table name'
+                }
+              },
+              required: ['dataplane', 'catalog', 'schema', 'table']
+            }
           }
         ]
       };
@@ -97,6 +177,18 @@ class XDPMCPServer {
         switch (name) {
           case 'xdp_list_datastores':
             return await this.handleListDataStores(args as ListDataStoresParams);
+          
+          case 'trino_execute_query':
+            return await this.handleTrinoExecuteQuery(args as any);
+          
+          case 'trino_list_catalogs':
+            return await this.handleTrinoListCatalogs(args as any);
+          
+          case 'trino_list_tables':
+            return await this.handleTrinoListTables(args as any);
+          
+          case 'trino_describe_table':
+            return await this.handleTrinoDescribeTable(args as any);
           
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -143,6 +235,107 @@ class XDPMCPServer {
   }
 
   /**
+   * Handle Trino query execution
+   */
+  private async handleTrinoExecuteQuery(params: TrinoExecuteParams) {
+    console.error('🔍 Executing Trino query...');
+    
+    try {
+      const result = await this.xdpClient.executeTrinoQuery(params);
+      const responseText = this.formatTrinoQueryResponse(result, params.query);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseText
+          }
+        ]
+      };
+    } catch (error) {
+      console.error('❌ Failed to execute Trino query:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle listing Trino catalogs
+   */
+  private async handleTrinoListCatalogs(params: { dataplane: string }) {
+    console.error('📚 Listing Trino catalogs...');
+    
+    try {
+      const result = await this.xdpClient.listTrinoCatalogs(params.dataplane);
+      const responseText = this.formatTrinoCatalogsResponse(result);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseText
+          }
+        ]
+      };
+    } catch (error) {
+      console.error('❌ Failed to list Trino catalogs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle listing Trino tables
+   */
+  private async handleTrinoListTables(params: { dataplane: string; catalog: string; schema?: string }) {
+    console.error('📋 Listing Trino tables...');
+    
+    try {
+      const result = await this.xdpClient.listTrinoTables(params.dataplane, params.catalog, params.schema || '');
+      const responseText = this.formatTrinoTablesResponse(result, params.catalog, params.schema);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseText
+          }
+        ]
+      };
+    } catch (error) {
+      console.error('❌ Failed to list Trino tables:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle describing a Trino table
+   */
+  private async handleTrinoDescribeTable(params: { dataplane: string; catalog: string; schema: string; table: string }) {
+    console.error('🔍 Describing Trino table...');
+    
+    try {
+      const result = await this.xdpClient.getTrinoTableColumns(
+        params.dataplane, 
+        params.catalog, 
+        params.schema, 
+        params.table
+      );
+      const responseText = this.formatTrinoTableColumnsResponse(result, params.catalog, params.schema, params.table);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseText
+          }
+        ]
+      };
+    } catch (error) {
+      console.error('❌ Failed to describe Trino table:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Format the datastore response for display
    */
   private formatDataStoresResponse(result: any): string {
@@ -175,6 +368,135 @@ class XDPMCPServer {
       }
       response += `\n`;
     });
+
+    return response;
+  }
+
+  /**
+   * Format Trino query response
+   */
+  private formatTrinoQueryResponse(result: any, query: string): string {
+    let response = `# Trino Query Result\n\n`;
+    response += `**Query**: \`\`\`sql\n${query}\n\`\`\`\n\n`;
+    response += `**Status**: ${result.status}\n`;
+    response += `**Query ID**: ${result.queryId}\n\n`;
+
+    if (!result.result || !result.result.data) {
+      response += `No results returned.\n`;
+      return response;
+    }
+
+    const { columns, data } = result.result;
+    
+    if (!columns || columns.length === 0) {
+      response += `No columns in result set.\n`;
+      return response;
+    }
+
+    response += `**Results**: ${data.length} rows\n\n`;
+
+    // Format as a table
+    if (data.length > 0) {
+      // Table header
+      response += '| ' + columns.map((c: any) => c.name).join(' | ') + ' |\n';
+      response += '|' + columns.map(() => '---').join('|') + '|\n';
+      
+      // Table rows (limit to first 50 for readability)
+      const displayRows = data.slice(0, 50);
+      displayRows.forEach((row: any[]) => {
+        response += '| ' + row.map(val => val === null ? 'NULL' : String(val)).join(' | ') + ' |\n';
+      });
+      
+      if (data.length > 50) {
+        response += `\n*Showing first 50 of ${data.length} rows*\n`;
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * Format Trino catalogs response
+   */
+  private formatTrinoCatalogsResponse(result: any): string {
+    let response = `# Trino Catalogs\n\n`;
+
+    if (!result.result || !result.result.data || result.result.data.length === 0) {
+      response += `No catalogs found.\n`;
+      return response;
+    }
+
+    response += `**Available Catalogs**:\n\n`;
+    result.result.data.forEach((row: any[], index: number) => {
+      response += `${index + 1}. ${row[0]}\n`;
+    });
+
+    return response;
+  }
+
+  /**
+   * Format Trino tables response
+   */
+  private formatTrinoTablesResponse(result: any, catalog: string, schema?: string): string {
+    let response = `# Trino Tables\n\n`;
+    response += `**Catalog**: ${catalog}\n`;
+    if (schema) {
+      response += `**Schema**: ${schema}\n`;
+    }
+    response += '\n';
+
+    if (!result.result || !result.result.data || result.result.data.length === 0) {
+      response += `No tables found.\n`;
+      return response;
+    }
+
+    const { columns, data } = result.result;
+
+    // If we have multiple columns (schema, table, type), show as table
+    if (columns && columns.length > 1) {
+      response += '| ' + columns.map((c: any) => c.name).join(' | ') + ' |\n';
+      response += '|' + columns.map(() => '---').join('|') + '|\n';
+      
+      data.forEach((row: any[]) => {
+        response += '| ' + row.map(val => val === null ? 'NULL' : String(val)).join(' | ') + ' |\n';
+      });
+    } else {
+      // Simple list of table names
+      response += `**Tables**:\n\n`;
+      data.forEach((row: any[], index: number) => {
+        response += `${index + 1}. ${row[0]}\n`;
+      });
+    }
+
+    response += `\n**Total**: ${data.length} tables\n`;
+
+    return response;
+  }
+
+  /**
+   * Format Trino table columns response
+   */
+  private formatTrinoTableColumnsResponse(result: any, catalog: string, schema: string, table: string): string {
+    let response = `# Table Structure\n\n`;
+    response += `**Table**: ${catalog}.${schema}.${table}\n\n`;
+
+    if (!result.result || !result.result.data || result.result.data.length === 0) {
+      response += `No columns found.\n`;
+      return response;
+    }
+
+    const { data } = result.result;
+
+    response += `## Columns\n\n`;
+    response += '| Position | Column Name | Data Type | Nullable | Default |\n';
+    response += '|----------|-------------|-----------|----------|---------|\n';
+    
+    data.forEach((row: any[]) => {
+      const [columnName, dataType, isNullable, columnDefault, ordinalPosition] = row;
+      response += `| ${ordinalPosition} | ${columnName} | ${dataType} | ${isNullable} | ${columnDefault || 'NULL'} |\n`;
+    });
+
+    response += `\n**Total Columns**: ${data.length}\n`;
 
     return response;
   }
