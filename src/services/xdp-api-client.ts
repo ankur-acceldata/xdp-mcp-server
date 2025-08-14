@@ -12,7 +12,10 @@ import type {
   ListDataStoresResponse,
   TrinoQueryRequest,
   TrinoQueryResponse,
-  TrinoExecuteParams
+  TrinoExecuteParams,
+  Dataplane,
+  ListDataplanesResponse,
+  XDPDataplanesApiResponse
 } from '../types/xdp-types.js';
 
 export class XDPApiClient {
@@ -232,5 +235,34 @@ export class XDPApiClient {
       dataplane,
       query
     });
+  }
+
+  /**
+   * List all dataplanes from XDP API
+   */
+  async listDataplanes(): Promise<ListDataplanesResponse> {
+    try {
+      console.error(`[XDP API] Fetching dataplanes...`);
+
+      const response = await this.client.get<XDPDataplanesApiResponse>('/dataplane');
+
+      // Transform the response to our expected format
+      const result: ListDataplanesResponse = {
+        dataplanes: response.data.dataplanes || [],
+        pagination: {
+          page: response.data.meta.page,
+          size: response.data.meta.size,
+          totalElements: response.data.meta.count,
+          totalPages: Math.ceil(response.data.meta.count / response.data.meta.size)
+        }
+      };
+
+      console.error(`[XDP API] Successfully fetched ${result.dataplanes.length} dataplanes`);
+      return result;
+
+    } catch (error) {
+      console.error('[XDP API] Failed to fetch dataplanes:', error);
+      throw error;
+    }
   }
 }
