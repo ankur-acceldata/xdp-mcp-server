@@ -3,7 +3,7 @@
  *
  * Handles communication with XDP API using access key + secret key authentication
  */
-import type { XDPApiConfig, ListDataStoresParams, ListDataStoresResponse, TrinoQueryResponse, TrinoExecuteParams } from '../types/xdp-types.js';
+import type { XDPApiConfig, ListDataStoresParams, ListDataStoresResponse, TrinoQueryResponse, TrinoExecuteParams, ListDataplanesResponse } from '../types/xdp-types.js';
 export declare class XDPApiClient {
     private client;
     private config;
@@ -40,5 +40,9 @@ export declare class XDPApiClient {
      * Get column information for a Trino table
      */
     getTrinoTableColumns(dataplane: string, catalog: string, schema: string, table: string): Promise<TrinoQueryResponse>;
+    /**
+     * List all dataplanes from XDP API
+     */
+    listDataplanes(): Promise<ListDataplanesResponse>;
 }
 //# sourceMappingURL=xdp-api-client.d.ts.map

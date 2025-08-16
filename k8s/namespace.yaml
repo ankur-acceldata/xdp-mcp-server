@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mcp-server
+  labels:
+    name: mcp-server
+    app.kubernetes.io/name: xdp-mcp-server
+    app.kubernetes.io/component: namespace

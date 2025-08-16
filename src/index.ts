@@ -526,6 +526,9 @@ class XDPMCPServer {
   }
 }
 
+// Export for use in other modules
+export { XDPMCPServer };
+
 // Start the server
 if (import.meta.url === `file://${process.argv[1]}`) {
   const server = new XDPMCPServer();

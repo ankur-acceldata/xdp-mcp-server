@@ -82,4 +82,43 @@ export interface TrinoExecuteParams {
     dataplane: string;
     query: string;
 }
+export interface Dataplane {
+    id: number;
+    name: string;
+    url: string;
+    externalUrl: string;
+    description: string;
+    tenantId: string;
+    type: string;
+    status: string;
+    statusReportInterval: number;
+    version: string;
+    lastStatusReportTime: number | null;
+    healthReport: string | null;
+    registryUrl: string;
+    registryPrefix: string;
+    namespace: string;
+    installationType: string | null;
+    dataplaneVersion: string | null;
+    isInternalCall: boolean;
+    isRequestSentByDataplane: boolean;
+    dataplaneProperties: any | null;
+}
+export interface ListDataplanesResponse {
+    dataplanes: Dataplane[];
+    pagination: {
+        page: number;
+        size: number;
+        totalElements: number;
+        totalPages: number;
+    };
+}
+export interface XDPDataplanesApiResponse {
+    dataplanes: Dataplane[];
+    meta: {
+        size: number;
+        page: number;
+        count: number;
+    };
+}
 //# sourceMappingURL=xdp-types.d.ts.map

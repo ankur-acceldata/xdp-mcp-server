@@ -187,5 +187,30 @@ export class XDPApiClient {
             query
         });
     }
+    /**
+     * List all dataplanes from XDP API
+     */
+    async listDataplanes() {
+        try {
+            console.error(`[XDP API] Fetching dataplanes...`);
+            const response = await this.client.get('/dataplane');
+            // Transform the response to our expected format
+            const result = {
+                dataplanes: response.data.dataplanes || [],
+                pagination: {
+                    page: response.data.meta.page,
+                    size: response.data.meta.size,
+                    totalElements: response.data.meta.count,
+                    totalPages: Math.ceil(response.data.meta.count / response.data.meta.size)
+                }
+            };
+            console.error(`[XDP API] Successfully fetched ${result.dataplanes.length} dataplanes`);
+            return result;
+        }
+        catch (error) {
+            console.error('[XDP API] Failed to fetch dataplanes:', error);
+            throw error;
+        }
+    }
 }
 //# sourceMappingURL=xdp-api-client.js.map
