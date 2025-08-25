@@ -44,5 +44,23 @@ export declare class XDPApiClient {
      * List all dataplanes from XDP API
      */
     listDataplanes(): Promise<ListDataplanesResponse>;
+    /**
+     * Execute adhoc run via Bolt.DIY API and monitor logs
+     */
+    executeAdhocRun(params: {
+        projectId: string;
+        dataplaneId: string;
+        isEditAndRun?: boolean;
+        selectedTemplate?: {
+            id: string;
+            name: string;
+        };
+    }): Promise<{
+        success: boolean;
+        runId?: string;
+        status?: string;
+        logs?: string;
+        error?: string;
+    }>;
 }
 //# sourceMappingURL=xdp-api-client.d.ts.map

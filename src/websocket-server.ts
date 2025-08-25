@@ -51,7 +51,7 @@ export class XDPWebSocketServer {
   private xdpClient: XDPApiClient;
   private port: number;
 
-  constructor(port: number = 8080) {
+  constructor(port: number = 9099) {
     this.port = port;
     this.app = express();
     this.httpServer = createServer(this.app);
@@ -601,7 +601,7 @@ export class XDPWebSocketServer {
 
 // Start server if run directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const port = parseInt(process.env.PORT || '8080');
+  const port = parseInt(process.env.PORT || '9099');
   const server = new XDPWebSocketServer(port);
   
   // Graceful shutdown

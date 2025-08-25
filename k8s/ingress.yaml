@@ -32,9 +32,9 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: xdp-mcp-server-service
+            name: xdp-mcp-server
             port:
-              number: 3000
+              number: 9099
   # Uncomment if using TLS/SSL
   # tls:
   # - hosts:

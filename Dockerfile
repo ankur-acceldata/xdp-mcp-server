@@ -43,11 +43,11 @@ RUN mkdir -p /app/logs && chown -R nodejs:nodejs /app
 USER nodejs
 
 # Expose WebSocket/HTTP port
-EXPOSE 8080
+EXPOSE 9099
 
 # Health check for container orchestration
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+  CMD curl -f http://localhost:9099/health || exit 1
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

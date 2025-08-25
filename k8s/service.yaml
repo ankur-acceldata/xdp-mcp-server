@@ -13,13 +13,9 @@ spec:
     clientIP:
       timeoutSeconds: 10800  # 3 hours
   ports:
-  - name: http
-    port: 8080
-    targetPort: http
-    protocol: TCP
-  - name: websocket
-    port: 8080
-    targetPort: websocket
+  - name: http-ws
+    port: 9099
+    targetPort: 9099
     protocol: TCP
   selector:
     app.kubernetes.io/name: xdp-mcp-server

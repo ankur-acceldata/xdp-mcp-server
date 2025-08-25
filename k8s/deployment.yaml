@@ -24,7 +24,7 @@ spec:
         app.kubernetes.io/component: server
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "8080"
+        prometheus.io/port: "9099"
         prometheus.io/path: "/metrics"
     spec:
       securityContext:
@@ -34,14 +34,11 @@ spec:
         fsGroup: 1001
       containers:
       - name: xdp-mcp-server
-        image: xdp-mcp-server:latest
+        image: agarwalankur58/xdp-mcp-server:1.0.3
         imagePullPolicy: IfNotPresent
         ports:
         - name: http
-          containerPort: 8080
-          protocol: TCP
-        - name: websocket
-          containerPort: 8080
+          containerPort: 9099
           protocol: TCP
         env:
         - name: NODE_ENV
@@ -54,6 +51,8 @@ spec:
             configMapKeyRef:
               name: xdp-mcp-config
               key: LOG_LEVEL
+        - name: PORT
+          value: "9099"
         - name: XDP_BASE_URL
           valueFrom:
             configMapKeyRef:
@@ -79,7 +78,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: http
+            port: 9099
           initialDelaySeconds: 30
           periodSeconds: 30
           timeoutSeconds: 5
@@ -87,7 +86,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /ready
-            port: http
+            port: 9099
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 3

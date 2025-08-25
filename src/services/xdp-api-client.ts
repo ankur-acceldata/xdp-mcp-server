@@ -265,4 +265,96 @@ export class XDPApiClient {
       throw error;
     }
   }
+
+  /**
+   * Execute adhoc run via Bolt.DIY API and monitor logs
+   */
+  async executeAdhocRun(params: {
+    projectId: string;
+    dataplaneId: string;
+    isEditAndRun?: boolean;
+    selectedTemplate?: { id: string; name: string };
+  }): Promise<{
+    success: boolean;
+    runId?: string;
+    status?: string;
+    logs?: string;
+    error?: string;
+  }> {
+    try {
+      console.error(`[XDP API] Executing adhoc run for project ${params.projectId} on dataplane ${params.dataplaneId}`);
+
+      // Call Bolt.DIY's adhoc-run API
+      const boltApiUrl = process.env.BOLT_API_URL || 'http://localhost:5173';
+      const payload = {
+        dataplaneId: parseInt(params.dataplaneId),
+        projectId: params.projectId,
+        isEditAndRun: params.isEditAndRun || false,
+        selectedTemplate: params.selectedTemplate
+      };
+
+      const response = await axios.post(`${boltApiUrl}/api/adhoc-run`, payload, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 60000 // 60 second timeout for execution
+      });
+
+      const result = response.data;
+
+      if (!result.success || !result.data?.success) {
+        return {
+          success: false,
+          error: result.data?.message || result.message || 'Execution failed',
+          runId: result.data?.data?.id?.toString()
+        };
+      }
+
+      const runId = result.data?.data?.id?.toString();
+      console.error(`[XDP API] Adhoc run started successfully with runId: ${runId}`);
+
+      // Wait a moment for execution to start, then fetch initial logs
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      let logs = '';
+      try {
+        // Try to fetch logs - this is a best effort
+        const logsResponse = await axios.get(`${boltApiUrl}/api/log-stream`, {
+          params: {
+            dataplaneId: params.dataplaneId,
+            runId: runId,
+            tailLines: 100
+          },
+          timeout: 10000,
+          headers: {
+            'Accept': 'text/event-stream'
+          }
+        });
+
+        // Parse log data if available
+        if (logsResponse.data) {
+          logs = typeof logsResponse.data === 'string' ? logsResponse.data : JSON.stringify(logsResponse.data);
+        }
+      } catch (logError) {
+        console.error('[XDP API] Could not fetch logs:', logError);
+        logs = 'Logs are being generated. Check the Bolt.DIY interface for real-time logs.';
+      }
+
+      return {
+        success: true,
+        runId: runId,
+        status: 'STARTED',
+        logs: logs || 'Execution started successfully. Check logs panel for details.'
+      };
+
+    } catch (error) {
+      console.error('[XDP API] Failed to execute adhoc run:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
 }
