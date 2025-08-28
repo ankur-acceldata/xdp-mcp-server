@@ -48,13 +48,31 @@ export declare class XDPApiClient {
      * Execute adhoc run via Bolt.DIY API and monitor logs
      */
     executeAdhocRun(params: {
-        projectId: string;
         dataplaneId: string;
-        isEditAndRun?: boolean;
-        selectedTemplate?: {
-            id: string;
-            name: string;
-        };
+        jobType?: string;
+        description?: string;
+        name?: string;
+        image?: string;
+        imagePullSecrets?: string[];
+        imagePullPolicy?: string;
+        codeSourceUrl?: string;
+        stages?: string[];
+        executionType?: string;
+        executionMode?: string;
+        driverCores?: number;
+        driverMemory?: string;
+        driverMemoryOverhead?: string;
+        executorInstances?: number;
+        executorCores?: number;
+        executorMemory?: string;
+        executorMemoryOverhead?: string;
+        dynamicAllocationEnabled?: boolean;
+        dynamicAllocationInitial?: number;
+        dynamicAllocationMin?: number;
+        dynamicAllocationMax?: number;
+        dataStoreIds?: number[];
+        sparkConf?: Record<string, any>;
+        timeToLiveSeconds?: number;
     }): Promise<{
         success: boolean;
         runId?: string;
@@ -62,5 +80,9 @@ export declare class XDPApiClient {
         logs?: string;
         error?: string;
     }>;
+    /**
+     * Listen to SSE log stream and collect logs until completion
+     */
+    private listenToSSELogs;
 }
 //# sourceMappingURL=xdp-api-client.d.ts.map

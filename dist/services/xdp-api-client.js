@@ -217,62 +217,139 @@ export class XDPApiClient {
      */
     async executeAdhocRun(params) {
         try {
-            console.error(`[XDP API] Executing adhoc run for project ${params.projectId} on dataplane ${params.dataplaneId}`);
-            // Call Bolt.DIY's adhoc-run API
+            console.error(`[XDP API] Executing adhoc run on dataplane ${params.dataplaneId}`);
+            // Call Bolt.DIY's adhoc-run API using new AdhocRunRequestBody format
             const boltApiUrl = process.env.BOLT_API_URL || 'http://localhost:5173';
             const payload = {
                 dataplaneId: parseInt(params.dataplaneId),
-                projectId: params.projectId,
-                isEditAndRun: params.isEditAndRun || false,
-                selectedTemplate: params.selectedTemplate
+                jobType: params.jobType || "SPARK",
+                description: params.description || `Adhoc run on dataplane ${params.dataplaneId}`,
+                name: params.name || `adhoc-run-${Date.now()}`,
+                executionConfig: {
+                    jobType: params.jobType || "SPARK",
+                    image: params.image || "spark:3.3.0",
+                    imagePullSecrets: params.imagePullSecrets || [],
+                    imagePullPolicy: params.imagePullPolicy || "IfNotPresent",
+                    codeSource: {
+                        type: "MINIO",
+                        config: {
+                            url: params.codeSourceUrl || "",
+                            additionalParams: {}
+                        }
+                    },
+                    stages: params.stages || ["main"],
+                    type: params.executionType || "Python",
+                    mode: params.executionMode || "cluster",
+                    driver: {
+                        cores: params.driverCores || 1,
+                        memory: params.driverMemory || "1g",
+                        memoryOverhead: params.driverMemoryOverhead || "512m"
+                    },
+                    executor: {
+                        instances: params.executorInstances || 2,
+                        cores: params.executorCores || 1,
+                        memory: params.executorMemory || "1g",
+                        memoryOverhead: params.executorMemoryOverhead || "512m"
+                    },
+                    dynamicAllocation: {
+                        enabled: params.dynamicAllocationEnabled || false,
+                        initialExecutors: params.dynamicAllocationInitial || 2,
+                        minExecutors: params.dynamicAllocationMin || 1,
+                        maxExecutors: params.dynamicAllocationMax || 10,
+                        shuffleTrackingTimeout: 60
+                    },
+                    depends: {
+                        dataStores: (params.dataStoreIds || []).map(id => ({ dataStoreId: id }))
+                    },
+                    sparkConf: params.sparkConf || {},
+                    timeToLiveSeconds: params.timeToLiveSeconds || 3600
+                }
             };
-            const response = await axios.post(`${boltApiUrl}/api/adhoc-run`, payload, {
+            const url = `${this.config.baseUrl}/job/adhoc-runs`;
+            const requestHeaders = {
+                'Content-Type': 'application/json',
+                'accessKey': this.config.accessKey,
+                'secretKey': this.config.secretKey
+            };
+            console.error(`[XDP API] Calling URL: ${url}`);
+            console.error(`[XDP API] Headers:`, JSON.stringify(requestHeaders, null, 2));
+            console.error(`[XDP API] Payload:`, JSON.stringify(payload, null, 2));
+            const response = await this.client.post(`/job/adhoc-runs`, payload, {
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 timeout: 60000 // 60 second timeout for execution
             });
-            const result = response.data;
-            if (!result.success || !result.data?.success) {
+            console.error(`[XDP API] Raw response received, parsing...`);
+            let result;
+            try {
+                result = response.data;
+                console.error(`[XDP API] Response status:`, response.status);
+                console.error(`[XDP API] Response statusText:`, response.statusText);
+                console.error(`[XDP API] Full response:`, JSON.stringify(result, null, 2));
+                // More detailed parsing check
+                console.error(`[XDP API] result.success:`, result.success);
+                console.error(`[XDP API] result.data:`, result.data);
+                console.error(`[XDP API] result.data?.success:`, result.data?.success);
+                console.error(`[XDP API] result?.data:`, result?.data);
+                console.error(`[XDP API] result?.data?.id:`, result?.data?.id);
+            }
+            catch (parseError) {
+                console.error(`[XDP API] Error parsing response:`, parseError);
+                return {
+                    success: false,
+                    error: 'Failed to parse API response',
+                    runId: undefined
+                };
+            }
+            // Check if this is actually a success response with a different structure
+            if (response.status === 200 && result && (result.message === 'SUCCESS' || result.status === 'SUCCESS')) {
+                console.error(`[XDP API] Detected success response with message format`);
+                const runId = result.data?.id || result.id;
+                if (runId) {
+                    console.error(`[XDP API] Extracted runId from alternative format: ${runId}`);
+                    // Continue with success flow
+                }
+                else {
+                    console.error(`[XDP API] SUCCESS response but no runId found`);
+                    return {
+                        success: false,
+                        error: 'Job submitted successfully but no run ID returned',
+                        runId: undefined
+                    };
+                }
+            }
+            else if (!result.success || !result.data?.success) {
+                console.error(`[XDP API] Response indicates failure - result.success: ${result.success}, result.data?.success: ${result.data?.success}`);
                 return {
                     success: false,
                     error: result.data?.message || result.message || 'Execution failed',
-                    runId: result.data?.data?.id?.toString()
+                    runId: result.data?.id?.toString()
                 };
             }
-            const runId = result.data?.data?.id?.toString();
+            const runId = result.data?.id?.toString();
             console.error(`[XDP API] Adhoc run started successfully with runId: ${runId}`);
-            // Wait a moment for execution to start, then fetch initial logs
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Wait 10 seconds for execution to start, then start listening to SSE logs
+            console.error(`[XDP API] Waiting 10 seconds before starting log collection...`);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+            console.error(`[XDP API] 10 second wait completed, starting log collection...`);
             let logs = '';
             try {
-                // Try to fetch logs - this is a best effort
-                const logsResponse = await axios.get(`${boltApiUrl}/api/log-stream`, {
-                    params: {
-                        dataplaneId: params.dataplaneId,
-                        runId: runId,
-                        tailLines: 100
-                    },
-                    timeout: 10000,
-                    headers: {
-                        'Accept': 'text/event-stream'
-                    }
-                });
-                // Parse log data if available
-                if (logsResponse.data) {
-                    logs = typeof logsResponse.data === 'string' ? logsResponse.data : JSON.stringify(logsResponse.data);
-                }
+                console.error(`[XDP API] Starting SSE log stream for runId: ${runId}`);
+                logs = await this.listenToSSELogs(runId);
             }
             catch (logError) {
                 console.error('[XDP API] Could not fetch logs:', logError);
                 logs = 'Logs are being generated. Check the Bolt.DIY interface for real-time logs.';
             }
-            return {
+            const returnValue = {
                 success: true,
                 runId: runId,
-                status: 'STARTED',
+                status: result.data?.data?.status || 'STARTED',
                 logs: logs || 'Execution started successfully. Check logs panel for details.'
             };
+            console.error(`[XDP API] Returning success result:`, JSON.stringify(returnValue, null, 2));
+            return returnValue;
         }
         catch (error) {
             console.error('[XDP API] Failed to execute adhoc run:', error);
@@ -282,6 +359,79 @@ export class XDPApiClient {
                 error: errorMessage
             };
         }
+    }
+    /**
+     * Listen to SSE log stream and collect logs until completion
+     */
+    async listenToSSELogs(runId) {
+        return new Promise((resolve, reject) => {
+            const url = `${this.config.baseUrl}/job/run/logs/${runId}/sse?tailLines=100`;
+            console.error(`[XDP API] SSE URL: ${url}`);
+            let collectedLogs = '';
+            let completed = false;
+            // Set a maximum timeout for log collection (5 minutes)
+            const maxTimeout = setTimeout(() => {
+                console.error('[XDP API] SSE log collection timeout reached (1 minutes)');
+                completed = true;
+                resolve(collectedLogs || 'Log collection timed out after 1 minutes');
+            }, 60 * 1000);
+            // Create SSE request
+            const sseRequest = this.client.get(url, {
+                headers: {
+                    'Accept': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                },
+                responseType: 'stream',
+                timeout: 6 * 60 * 1000, // 6 minute timeout
+            });
+            sseRequest.then(response => {
+                console.error('[XDP API] SSE connection established');
+                response.data.on('data', (chunk) => {
+                    if (completed)
+                        return;
+                    const data = chunk.toString();
+                    console.error('[XDP API] SSE chunk received:', data);
+                    // Parse SSE format
+                    const lines = data.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const logData = line.substring(6).trim();
+                            if (logData === '[DONE]' || logData.includes('COMPLETED') || logData.includes('FINISHED')) {
+                                console.error('[XDP API] SSE stream completed');
+                                completed = true;
+                                clearTimeout(maxTimeout);
+                                resolve(collectedLogs);
+                                return;
+                            }
+                            if (logData && logData !== '') {
+                                collectedLogs += logData + '\n';
+                                console.error('[XDP API] Log line:', logData);
+                            }
+                        }
+                    }
+                });
+                response.data.on('end', () => {
+                    console.error('[XDP API] SSE stream ended');
+                    if (!completed) {
+                        completed = true;
+                        clearTimeout(maxTimeout);
+                        resolve(collectedLogs || 'Stream ended without completion signal');
+                    }
+                });
+                response.data.on('error', (error) => {
+                    console.error('[XDP API] SSE stream error:', error);
+                    if (!completed) {
+                        completed = true;
+                        clearTimeout(maxTimeout);
+                        reject(error);
+                    }
+                });
+            }).catch(error => {
+                console.error('[XDP API] Failed to establish SSE connection:', error);
+                clearTimeout(maxTimeout);
+                reject(error);
+            });
+        });
     }
 }
 //# sourceMappingURL=xdp-api-client.js.map

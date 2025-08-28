@@ -34,7 +34,7 @@ interface JSONRPCResponse {
   };
 }
 import { XDPApiClient } from './services/xdp-api-client.js';
-import type { ListDataStoresParams, TrinoExecuteParams } from './types/xdp-types.js';
+import type { ListDataStoresParams, TrinoExecuteParams, ExecuteAndMonitorParams } from './types/xdp-types.js';
 
 interface SessionData {
   id: string;
@@ -311,7 +311,7 @@ export class XDPWebSocketServer {
     // Execute and monitor endpoint
     this.app.post('/api/execute-monitor', async (req, res) => {
       try {
-        const result = await this.handleExecuteAndMonitor(req.body);
+        const result = await this.handleExecuteAndMonitor(req.body as ExecuteAndMonitorParams);
         res.json(result);
       } catch (error) {
         res.status(500).json({ 
@@ -563,26 +563,138 @@ export class XDPWebSocketServer {
                 type: 'string',
                 description: 'Unique session ID for tracking execution limits'
               },
-              projectId: {
-                type: 'string',
-                description: 'Project ID for the code to execute'
-              },
               dataplaneId: {
                 type: 'string',
                 description: 'Dataplane ID where code should be executed'
               },
-              isEditAndRun: {
+              jobType: {
+                type: 'string',
+                description: 'Type of job to execute',
+                enum: ['SPARK', 'Python', 'Java'],
+                default: 'SPARK'
+              },
+              description: {
+                type: 'string',
+                description: 'Optional description for the adhoc run'
+              },
+              name: {
+                type: 'string',
+                description: 'Optional name for the adhoc run'
+              },
+              image: {
+                type: 'string',
+                description: 'Docker image to use for execution',
+                default: 'spark:3.3.0'
+              },
+              imagePullSecrets: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Image pull secrets for private registries',
+                default: []
+              },
+              imagePullPolicy: {
+                type: 'string',
+                description: 'Image pull policy',
+                enum: ['Always', 'IfNotPresent', 'Never'],
+                default: 'IfNotPresent'
+              },
+              codeSourceUrl: {
+                type: 'string',
+                description: 'URL to the code source (e.g., S3/MinIO URL)',
+                default: ''
+              },
+              stages: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Execution stages',
+                default: ['main']
+              },
+              executionType: {
+                type: 'string',
+                description: 'Execution type',
+                enum: ['Python', 'Java'],
+                default: 'Python'
+              },
+              executionMode: {
+                type: 'string',
+                description: 'Execution mode',
+                enum: ['cluster', 'client'],
+                default: 'cluster'
+              },
+              driverCores: {
+                type: 'number',
+                description: 'Number of CPU cores for driver',
+                default: 1,
+                minimum: 1
+              },
+              driverMemory: {
+                type: 'string',
+                description: 'Memory allocation for driver',
+                default: '1g'
+              },
+              driverMemoryOverhead: {
+                type: 'string',
+                description: 'Memory overhead for driver',
+                default: '512m'
+              },
+              executorInstances: {
+                type: 'number',
+                description: 'Number of executor instances',
+                default: 2,
+                minimum: 1
+              },
+              executorCores: {
+                type: 'number',
+                description: 'Number of CPU cores per executor',
+                default: 1,
+                minimum: 1
+              },
+              executorMemory: {
+                type: 'string',
+                description: 'Memory allocation per executor',
+                default: '1g'
+              },
+              executorMemoryOverhead: {
+                type: 'string',
+                description: 'Memory overhead per executor',
+                default: '512m'
+              },
+              dynamicAllocationEnabled: {
                 type: 'boolean',
-                description: 'Whether to edit config before running',
+                description: 'Enable dynamic allocation of executors',
                 default: false
               },
-              selectedTemplate: {
+              dynamicAllocationInitial: {
+                type: 'number',
+                description: 'Initial number of executors when dynamic allocation is enabled',
+                default: 2
+              },
+              dynamicAllocationMin: {
+                type: 'number',
+                description: 'Minimum number of executors',
+                default: 1
+              },
+              dynamicAllocationMax: {
+                type: 'number',
+                description: 'Maximum number of executors',
+                default: 10
+              },
+              dataStoreIds: {
+                type: 'array',
+                items: { type: 'number' },
+                description: 'Array of data store IDs this job depends on',
+                default: []
+              },
+              sparkConf: {
                 type: 'object',
-                description: 'Template configuration for execution',
-                properties: {
-                  id: { type: 'string' },
-                  name: { type: 'string' }
-                }
+                description: 'Additional Spark configuration as key-value pairs',
+                additionalProperties: true,
+                default: {}
+              },
+              timeToLiveSeconds: {
+                type: 'number',
+                description: 'Time to live for the job in seconds',
+                default: 3600
               },
               isManualTrigger: {
                 type: 'boolean',
@@ -590,7 +702,7 @@ export class XDPWebSocketServer {
                 default: false
               }
             },
-            required: ['sessionId', 'projectId', 'dataplaneId']
+            required: ['sessionId', 'dataplaneId']
           }
         },
         {
@@ -648,27 +760,23 @@ export class XDPWebSocketServer {
         );
       
       case 'execute_and_monitor':
-        return await this.handleExecuteAndMonitor(params);
+        return await this.handleExecuteAndMonitor(params as ExecuteAndMonitorParams);
       
       case 'register_manual_execution':
-        return await this.handleRegisterManualExecution(params);
+        return await this.handleRegisterManualExecution(params as any);
       
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
   }
 
-  private async handleExecuteAndMonitor(params: {
-    sessionId: string;
-    projectId: string;
-    dataplaneId: string;
-    isEditAndRun?: boolean;
-    selectedTemplate?: { id: string; name: string };
-    isManualTrigger?: boolean;
-  }) {
-    console.log('🚀 Executing code with monitoring and loop prevention...');
+  /**
+   * Handle the execute_and_monitor tool with loop prevention and manual-first requirement
+   */
+  private async handleExecuteAndMonitor(params: ExecuteAndMonitorParams) {
+    console.error('🚀 Executing code with monitoring and loop prevention...');
     
-    const { sessionId, projectId, dataplaneId, isEditAndRun = false, selectedTemplate, isManualTrigger = false } = params;
+    const { sessionId, dataplaneId, isManualTrigger = false } = params;
     const MAX_EXECUTIONS = 3;
     const MIN_DELAY_MS = 30000; // 30 seconds between executions
 
@@ -724,21 +832,16 @@ export class XDPWebSocketServer {
       // Mark that we have a manual execution for this session
       if (isManualTrigger) {
         tracking.hasManualExecution = true;
-        console.log(`✋ Manual execution registered for session ${sessionId}`);
+        console.error(`✋ Manual execution registered for session ${sessionId}`);
       }
       
       this.executionTracking.set(sessionId, tracking);
 
       const executionType = isManualTrigger ? 'Manual' : 'Auto-retry';
-      console.log(`🔢 ${executionType} execution ${tracking.count}/${MAX_EXECUTIONS} for session ${sessionId}`);
+      console.error(`🔢 ${executionType} execution ${tracking.count}/${MAX_EXECUTIONS} for session ${sessionId}`);
 
       // Call the Bolt.DIY adhoc run API
-      const executionResult = await this.xdpClient.executeAdhocRun({
-        projectId,
-        dataplaneId,
-        isEditAndRun,
-        selectedTemplate
-      });
+      const executionResult = await this.xdpClient.executeAdhocRun(params);
 
       if (!executionResult.success) {
         // Track the error
@@ -790,12 +893,15 @@ export class XDPWebSocketServer {
     }
   }
 
+  /**
+   * Handle registering a manual execution to enable auto-retry
+   */
   private async handleRegisterManualExecution(params: {
     sessionId: string;
     runId?: string;
     success: boolean;
   }) {
-    console.log('📝 Registering manual execution...');
+    console.error('📝 Registering manual execution...');
     
     const { sessionId, runId, success } = params;
 
@@ -819,7 +925,7 @@ export class XDPWebSocketServer {
         ? `✅ **Manual Execution Successful**\n\nAuto-retry is now enabled for this session. If errors occur in future runs, I can automatically retry up to 3 times.`
         : `❌ **Manual Execution Failed**\n\nAuto-retry is now enabled for this session. I can help fix the issues and automatically retry up to 3 times.`;
 
-      console.log(`✋ Manual execution registered for session ${sessionId}: ${success ? 'SUCCESS' : 'FAILED'}`);
+      console.error(`✋ Manual execution registered for session ${sessionId}: ${success ? 'SUCCESS' : 'FAILED'}`);
 
       return {
         content: [
