@@ -1,0 +1,42 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: xdp-mcp-server-ingress
+  namespace: mcp-server
+  labels:
+    app.kubernetes.io/name: xdp-mcp-server
+    app.kubernetes.io/component: ingress
+  annotations:
+    # Common ingress annotations - adjust based on your ingress controller
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"  # Uncomment if using cert-manager
+    
+    # Rate limiting (optional)
+    nginx.ingress.kubernetes.io/rate-limit-connections: "10"
+    nginx.ingress.kubernetes.io/rate-limit-requests-per-second: "5"
+    
+    # CORS settings (if needed)
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type, Authorization"
+spec:
+  ingressClassName: nginx  # Adjust based on your ingress controller
+  rules:
+  - host: mcp-server.yourdomain.com  # Replace with your actual domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: xdp-mcp-server
+            port:
+              number: 9099
+  # Uncomment if using TLS/SSL
+  # tls:
+  # - hosts:
+  #   - mcp-server.yourdomain.com
+  #   secretName: mcp-server-tls

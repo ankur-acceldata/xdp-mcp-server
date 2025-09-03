@@ -20,6 +20,7 @@ class XDPMCPServer {
   private server: Server;
   private xdpClient: XDPApiClient;
 
+
   constructor() {
     console.error('🚀 Initializing XDP MCP Server...');
     
@@ -190,6 +191,7 @@ class XDPMCPServer {
           case 'trino_describe_table':
             return await this.handleTrinoDescribeTable(args as any);
           
+
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -525,6 +527,9 @@ class XDPMCPServer {
     console.error('✅ XDP MCP Server started and ready for connections');
   }
 }
+
+// Export for use in other modules
+export { XDPMCPServer };
 
 // Start the server
 if (import.meta.url === `file://${process.argv[1]}`) {

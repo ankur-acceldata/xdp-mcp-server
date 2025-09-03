@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "xdp": {
+      "command": "node",
+      "args": ["/path/to/deployed/xdp-mcp-server/dist/index.js"],
+      "env": {
+        "XDP_ACCESS_KEY": "YOUR_PRODUCTION_ACCESS_KEY",
+        "XDP_SECRET_KEY": "YOUR_PRODUCTION_SECRET_KEY"
+      }
+    }
+  }
+}
