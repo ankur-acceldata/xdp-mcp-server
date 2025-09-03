@@ -8,7 +8,6 @@
 declare class XDPMCPServer {
     private server;
     private xdpClient;
-    private executionTracking;
     constructor();
     private setupHandlers;
     /**
@@ -31,14 +30,6 @@ declare class XDPMCPServer {
      * Handle describing a Trino table
      */
     private handleTrinoDescribeTable;
-    /**
-     * Handle the execute_and_monitor tool with loop prevention and manual-first requirement
-     */
-    private handleExecuteAndMonitor;
-    /**
-     * Handle registering a manual execution to enable auto-retry
-     */
-    private handleRegisterManualExecution;
     /**
      * Format the datastore response for display
      */
