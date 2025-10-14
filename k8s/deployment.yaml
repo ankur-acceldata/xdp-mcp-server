@@ -34,8 +34,8 @@ spec:
         fsGroup: 1001
       containers:
       - name: xdp-mcp-server
-        image: agarwalankur58/xdp-mcp-server:1.0.3
-        imagePullPolicy: IfNotPresent
+        image: inderjotpujara/xdp-mcp-server:1.0.4
+        imagePullPolicy: Always
         ports:
         - name: http
           containerPort: 9099

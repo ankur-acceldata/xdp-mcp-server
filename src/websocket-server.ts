@@ -240,8 +240,19 @@ export class XDPWebSocketServer {
         const result = await this.xdpClient.listDataStores(params);
         res.json(result);
       } catch (error) {
-        res.status(500).json({ 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+        res.status(500).json({
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
+
+    this.app.get('/api/xdp/dataplanes', async (req, res) => {
+      try {
+        const result = await this.xdpClient.listDataplanes();
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     });
@@ -477,11 +488,11 @@ export class XDPWebSocketServer {
         },
         {
           name: 'trino_execute_query',
-          description: 'Execute a custom Trino SQL query on the specified dataplane',
+          description: 'Execute a custom Trino SQL query on the specified dataplane (requires dataplane ID, not name)',
           inputSchema: {
             type: 'object',
             properties: {
-              dataplane: { type: 'string' },
+              dataplane: { type: 'string', description: 'The dataplane ID (not name). Use get_all_dataplanes to find the correct ID.' },
               query: { type: 'string' }
             },
             required: ['dataplane', 'query']
@@ -489,22 +500,22 @@ export class XDPWebSocketServer {
         },
         {
           name: 'trino_list_catalogs',
-          description: 'List all available Trino catalogs in the specified dataplane',
+          description: 'List all available Trino catalogs in the specified dataplane (requires dataplane ID, not name)',
           inputSchema: {
             type: 'object',
             properties: {
-              dataplane: { type: 'string' }
+              dataplane: { type: 'string', description: 'The dataplane ID (not name). Use get_all_dataplanes to find the correct ID.' }
             },
             required: ['dataplane']
           }
         },
         {
           name: 'trino_list_tables',
-          description: 'List tables in a Trino catalog and schema',
+          description: 'List tables in a Trino catalog and schema (requires dataplane ID, not name)',
           inputSchema: {
             type: 'object',
             properties: {
-              dataplane: { type: 'string' },
+              dataplane: { type: 'string', description: 'The dataplane ID (not name). Use get_all_dataplanes to find the correct ID.' },
               catalog: { type: 'string' },
               schema: { type: 'string' }
             },
@@ -513,16 +524,25 @@ export class XDPWebSocketServer {
         },
         {
           name: 'trino_describe_table',
-          description: 'Get column information for a specific Trino table',
+          description: 'Get column information for a specific Trino table (requires dataplane ID, not name)',
           inputSchema: {
             type: 'object',
             properties: {
-              dataplane: { type: 'string' },
+              dataplane: { type: 'string', description: 'The dataplane ID (not name). Use get_all_dataplanes to find the correct ID.' },
               catalog: { type: 'string' },
               schema: { type: 'string' },
               table: { type: 'string' }
             },
             required: ['dataplane', 'catalog', 'schema', 'table']
+          }
+        },
+        {
+          name: 'get_all_dataplanes',
+          description: 'List all available dataplanes from XDP platform',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            additionalProperties: false
           }
         }
       ]
@@ -556,7 +576,9 @@ export class XDPWebSocketServer {
           params.schema,
           params.table
         );
-      
+
+      case 'get_all_dataplanes':
+        return await this.xdpClient.listDataplanes();
 
       default:
         throw new Error(`Unknown tool: ${toolName}`);

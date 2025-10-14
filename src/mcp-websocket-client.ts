@@ -133,13 +133,20 @@ export class MCPWebSocketClient {
   }
 
   /**
+   * Get all dataplanes from the MCP server
+   */
+  async getAllDataplanes(): Promise<MCPToolResult> {
+    return await this.executeTool('get_all_dataplanes', {});
+  }
+
+  /**
    * Execute a custom query via HTTP fallback
    */
   async executeCustomQuery(endpoint: string, params: any): Promise<any> {
     // This can be used as a fallback to HTTP if WebSocket fails
     const baseUrl = this.config.url.replace('ws://', 'http://').replace('wss://', 'https://');
     const apiUrl = baseUrl.replace('/ws', '');
-    
+
     const response = await fetch(`${apiUrl}/api${endpoint}`, {
       method: 'POST',
       headers: {

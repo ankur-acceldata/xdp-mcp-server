@@ -172,13 +172,15 @@ export class XDPApiClient {
       };
 
       console.error(`[XDP API] Executing Trino query on dataplane ${params.dataplane}`);
-      console.error(`[XDP API] Query: ${params.query.substring(0, 100)}...`);
+      console.error(`[XDP API] Query: ${params.query}...`);
+      console.error(`[XDP API] Request payload:`, JSON.stringify(queryRequest, null, 2));
 
       const response = await this.client.post<TrinoQueryResponse>('/query/execute', queryRequest);
 
       // Check if the query failed
       if (response.data.error || response.data.result?.error) {
         const errorMsg = response.data.error || response.data.result?.error;
+        console.error(JSON.stringify(response.data, null, 2));
         throw new Error(`Trino query error: ${errorMsg}`);
       }
 

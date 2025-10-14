@@ -83,6 +83,25 @@ app.get('/datastores', async (req, res) => {
   }
 });
 
+// List dataplanes endpoint (direct)
+app.get('/dataplanes', async (req, res) => {
+  try {
+    const result = await executeMCPRequest({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'tools/call',
+      params: {
+        name: 'get_all_dataplanes',
+        arguments: {}
+      }
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // Execute Trino query
 app.post('/trino/execute', async (req, res) => {
   try {
@@ -198,5 +217,6 @@ app.listen(PORT as number, HOST, () => {
   console.log('  GET  /tools');
   console.log('  POST /tools/execute');
   console.log('  GET  /datastores');
+  console.log('  GET  /dataplanes');
   console.log('  POST /trino/execute');
 });

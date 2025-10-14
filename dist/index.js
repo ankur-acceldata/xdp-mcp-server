@@ -70,13 +70,13 @@ class XDPMCPServer {
                     },
                     {
                         name: 'trino_execute_query',
-                        description: 'Execute a custom Trino SQL query on the specified dataplane',
+                        description: 'Execute a custom Trino SQL query on the specified dataplane (requires dataplane ID, not name)',
                         inputSchema: {
                             type: 'object',
                             properties: {
                                 dataplane: {
                                     type: 'string',
-                                    description: 'The dataplane ID to execute the query on'
+                                    description: 'The dataplane ID (not name) to execute the query on. Use get_all_dataplanes to find the correct ID.'
                                 },
                                 query: {
                                     type: 'string',
@@ -88,13 +88,13 @@ class XDPMCPServer {
                     },
                     {
                         name: 'trino_list_catalogs',
-                        description: 'List all available Trino catalogs in the specified dataplane',
+                        description: 'List all available Trino catalogs in the specified dataplane. ⚠️ CRITICAL: Use dataplane ID (number like "21"), NOT name (like "manoj-xdp-trino")',
                         inputSchema: {
                             type: 'object',
                             properties: {
                                 dataplane: {
                                     type: 'string',
-                                    description: 'The dataplane ID to list catalogs from'
+                                    description: 'The dataplane ID number (e.g., "21" not "manoj-xdp-trino"). Call get_all_dataplanes first to get the ID.'
                                 }
                             },
                             required: ['dataplane']
@@ -102,13 +102,13 @@ class XDPMCPServer {
                     },
                     {
                         name: 'trino_list_tables',
-                        description: 'List tables in a Trino catalog and schema',
+                        description: 'List tables in a Trino catalog and schema (requires dataplane ID, not name)',
                         inputSchema: {
                             type: 'object',
                             properties: {
                                 dataplane: {
                                     type: 'string',
-                                    description: 'The dataplane ID'
+                                    description: 'The dataplane ID (not name). Use get_all_dataplanes to find the correct ID.'
                                 },
                                 catalog: {
                                     type: 'string',
@@ -124,13 +124,13 @@ class XDPMCPServer {
                     },
                     {
                         name: 'trino_describe_table',
-                        description: 'Get column information for a specific Trino table',
+                        description: 'Get column information for a specific Trino table (requires dataplane ID, not name)',
                         inputSchema: {
                             type: 'object',
                             properties: {
                                 dataplane: {
                                     type: 'string',
-                                    description: 'The dataplane ID'
+                                    description: 'The dataplane ID (not name). Use get_all_dataplanes to find the correct ID.'
                                 },
                                 catalog: {
                                     type: 'string',
@@ -146,6 +146,15 @@ class XDPMCPServer {
                                 }
                             },
                             required: ['dataplane', 'catalog', 'schema', 'table']
+                        }
+                    },
+                    {
+                        name: 'get_all_dataplanes',
+                        description: 'List all available dataplanes from XDP platform',
+                        inputSchema: {
+                            type: 'object',
+                            properties: {},
+                            additionalProperties: false
                         }
                     }
                 ]
@@ -168,6 +177,8 @@ class XDPMCPServer {
                         return await this.handleTrinoListTables(args);
                     case 'trino_describe_table':
                         return await this.handleTrinoDescribeTable(args);
+                    case 'get_all_dataplanes':
+                        return await this.handleGetAllDataplanes();
                     default:
                         throw new Error(`Unknown tool: ${name}`);
                 }
@@ -294,6 +305,47 @@ class XDPMCPServer {
         }
         catch (error) {
             console.error('❌ Failed to describe Trino table:', error);
+            throw error;
+        }
+    }
+    /**
+     * Handle the get_all_dataplanes tool
+     */
+    async handleGetAllDataplanes() {
+        console.error('🏗️ Fetching dataplanes from XDP API...');
+        try {
+            const result = await this.xdpClient.listDataplanes();
+            // Return raw structured data with clear formatting
+            const responseText = `# XDP Dataplanes
+
+**IMPORTANT**: For Trino operations, use the **ID** number, NOT the name!
+
+## Available Dataplanes:
+
+${result.dataplanes.map((dp, index) => `
+**${index + 1}. ${dp.name}**
+- **🆔 USE THIS ID FOR TRINO**: ${dp.id}
+- **Name**: ${dp.name}
+- **Status**: ${dp.status}
+- **Tenant**: ${dp.tenantId}
+${dp.description ? `- **Description**: ${dp.description}` : ''}
+${dp.externalUrl ? `- **URL**: ${dp.externalUrl}` : ''}
+`).join('\n')}
+
+**Total**: ${result.dataplanes.length} dataplanes
+
+**⚠️ REMINDER**: When using trino_list_catalogs, trino_execute_query, etc., use the **ID number** (e.g., ${result.dataplanes[0]?.id}), not the name (e.g., "${result.dataplanes[0]?.name}").`;
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: responseText
+                    }
+                ]
+            };
+        }
+        catch (error) {
+            console.error('❌ Failed to fetch dataplanes:', error);
             throw error;
         }
     }
@@ -429,6 +481,41 @@ class XDPMCPServer {
             response += `| ${ordinalPosition} | ${columnName} | ${dataType} | ${isNullable} | ${columnDefault || 'NULL'} |\n`;
         });
         response += `\n**Total Columns**: ${data.length}\n`;
+        return response;
+    }
+    /**
+     * Format the dataplanes response for display
+     */
+    formatDataplanesResponse(result) {
+        const { dataplanes, pagination } = result;
+        let response = `# XDP Dataplanes\n\n`;
+        response += `**Total**: ${pagination.totalElements} dataplanes\n`;
+        response += `**Page**: ${pagination.page + 1} of ${pagination.totalPages}\n`;
+        response += `**Showing**: ${dataplanes.length} items\n\n`;
+        if (dataplanes.length === 0) {
+            response += `No dataplanes found.\n`;
+            return response;
+        }
+        response += `## Dataplanes\n\n`;
+        dataplanes.forEach((dp, index) => {
+            response += `### ${index + 1}. ${dp.name || 'Unnamed'}\n`;
+            response += `- **ID**: ${dp.id}\n`;
+            response += `- **Dataplane ID**: ${dp.id}\n`;
+            response += `- **Tenant**: ${dp.tenantId}\n`;
+            if (dp.description) {
+                response += `- **Description**: ${dp.description}\n`;
+            }
+            if (dp.status) {
+                response += `- **Status**: ${dp.status}\n`;
+            }
+            if (dp.createdAt) {
+                response += `- **Created**: ${new Date(dp.createdAt).toLocaleString()}\n`;
+            }
+            if (dp.updatedAt) {
+                response += `- **Last Updated**: ${new Date(dp.updatedAt).toLocaleString()}\n`;
+            }
+            response += `\n`;
+        });
         return response;
     }
     /**

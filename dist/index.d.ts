@@ -31,6 +31,10 @@ declare class XDPMCPServer {
      */
     private handleTrinoDescribeTable;
     /**
+     * Handle the get_all_dataplanes tool
+     */
+    private handleGetAllDataplanes;
+    /**
      * Format the datastore response for display
      */
     private formatDataStoresResponse;
@@ -50,6 +54,10 @@ declare class XDPMCPServer {
      * Format Trino table columns response
      */
     private formatTrinoTableColumnsResponse;
+    /**
+     * Format the dataplanes response for display
+     */
+    private formatDataplanesResponse;
     /**
      * Start the MCP server
      */
